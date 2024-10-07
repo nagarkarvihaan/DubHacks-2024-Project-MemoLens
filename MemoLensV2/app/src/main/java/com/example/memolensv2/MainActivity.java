@@ -16,6 +16,7 @@ import android.media.ImageReader;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.StrictMode;
 import android.util.Log;
 import android.view.Surface;
 import android.view.TextureView;
@@ -46,6 +47,10 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // Disable StrictMode temporarily for network operations
+        StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
+        StrictMode.setThreadPolicy(policy);
 
         mTextureView = findViewById(R.id.texture);
         mTextureView.setSurfaceTextureListener(textureListener);
@@ -186,8 +191,8 @@ public class MainActivity extends Activity {
                 byte[] imageBytes = new byte[buffer.capacity()];
                 buffer.get(imageBytes);
 
-                // Use the ImageUploadTask to send the image bytes to the server
-                new ImageUploadTask(imageBytes).uploadImage("http://YOUR_SERVER_IP:PORT/upload");
+                // Sending imageBytes via HTTP POST request
+                new ImageUploadTask(imageBytes).uploadImage("https://192.0.0.2:5000/upload");
 
             } catch (Exception e) {
                 e.printStackTrace();
