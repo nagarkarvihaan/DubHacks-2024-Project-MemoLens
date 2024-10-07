@@ -186,7 +186,8 @@ public class MainActivity extends Activity {
                 byte[] imageBytes = new byte[buffer.capacity()];
                 buffer.get(imageBytes);
 
-                // TODO: Add code to send imageBytes via HTTP POST request
+                // Use the ImageUploadTask to send the image bytes to the server
+                new ImageUploadTask(imageBytes).uploadImage("http://YOUR_SERVER_IP:PORT/upload");
 
             } catch (Exception e) {
                 e.printStackTrace();
