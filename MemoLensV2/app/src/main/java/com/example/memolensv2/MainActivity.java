@@ -192,7 +192,7 @@ public class MainActivity extends Activity {
                 buffer.get(imageBytes);
 
                 // Sending imageBytes via HTTP POST request
-                new ImageUploadTask(imageBytes).uploadImage("https://192.0.0.2:5000/upload");
+                new ImageUploadTask(imageBytes).uploadImage("http://10.136.29.27:5000/upload");
 
             } catch (Exception e) {
                 e.printStackTrace();
