@@ -4,6 +4,8 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
@@ -26,6 +28,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
@@ -191,8 +194,14 @@ public class MainActivity extends Activity {
                 byte[] imageBytes = new byte[buffer.capacity()];
                 buffer.get(imageBytes);
 
-                // Sending imageBytes via HTTP POST request
-                new ImageUploadTask(imageBytes).uploadImage("http://10.136.4.75:5000/upload");
+                // Compress the image before sending it
+                Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
+                ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream);  // 80% quality to reduce size
+                byte[] compressedBytes = stream.toByteArray();
+
+                // Sending compressedBytes via HTTP POST request
+                new ImageUploadTask(compressedBytes).uploadImage("http://10.136.4.75:5000/upload");
 
             } catch (Exception e) {
                 e.printStackTrace();

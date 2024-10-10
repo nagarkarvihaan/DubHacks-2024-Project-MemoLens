@@ -28,6 +28,10 @@ public class ImageUploadTask {
                 connection.setDoOutput(true);
                 connection.setRequestProperty("Content-Type", "application/octet-stream");
 
+                // Set timeouts (e.g., 10 minutes)
+                connection.setConnectTimeout(600000);  // 10 minutes
+                connection.setReadTimeout(600000);     // 10 minutes
+
                 DataOutputStream outputStream = new DataOutputStream(connection.getOutputStream());
                 outputStream.write(imageBytes);
                 outputStream.flush();
