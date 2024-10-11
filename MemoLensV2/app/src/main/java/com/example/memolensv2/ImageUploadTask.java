@@ -72,7 +72,14 @@ public class ImageUploadTask {
             // Update the UI on the main thread
             String finalResponse = response;
             new Handler(Looper.getMainLooper()).post(() -> {
-                Toast.makeText(context, "Upload result: " + finalResponse, Toast.LENGTH_LONG).show();
+                // Customize toast messages based on the server response
+                if (finalResponse.contains("Person in picture: Adil")) {
+                    Toast.makeText(context, "This is Adil, your brother.", Toast.LENGTH_LONG).show();
+                } else if (finalResponse.contains("Not able to recognize anyone in picture")) {
+                    Toast.makeText(context, "Not able to recognize anyone in picture.", Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(context, "Upload result: " + finalResponse, Toast.LENGTH_LONG).show();
+                }
             });
         });
     }
