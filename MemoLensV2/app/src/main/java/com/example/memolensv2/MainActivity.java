@@ -201,7 +201,7 @@ public class MainActivity extends Activity {
                 byte[] compressedBytes = stream.toByteArray();
 
                 // Sending compressedBytes via HTTP POST request
-                new ImageUploadTask(compressedBytes).uploadImage("http://10.136.4.75:5000/upload");
+                new ImageUploadTask(compressedBytes).uploadImage("http://10.136.9.145:5000/upload");
 
             } catch (Exception e) {
                 e.printStackTrace();
