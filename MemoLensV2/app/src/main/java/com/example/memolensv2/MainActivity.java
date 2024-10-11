@@ -13,12 +13,12 @@ import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.TotalCaptureResult;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.StrictMode;
 import android.util.Log;
 import android.view.Surface;
 import android.view.TextureView;
@@ -50,10 +50,6 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        // Disable StrictMode temporarily for network operations
-        StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
-        StrictMode.setThreadPolicy(policy);
 
         mTextureView = findViewById(R.id.texture);
         mTextureView.setSurfaceTextureListener(textureListener);
@@ -168,18 +164,29 @@ public class MainActivity extends Activity {
 
             reader.setOnImageAvailableListener(readerListener, mBackgroundHandler);
 
+            // Create a capture session for the capture request and the output surfaces
             mCameraDevice.createCaptureSession(outputSurfaces, new CameraCaptureSession.StateCallback() {
                 @Override
-                public void onConfigured(CameraCaptureSession session) {
+                public void onConfigured(@NonNull CameraCaptureSession session) {
                     try {
-                        session.capture(mCaptureRequestBuilder.build(), null, mBackgroundHandler);
+                        session.capture(mCaptureRequestBuilder.build(), new CameraCaptureSession.CaptureCallback() {
+                            @Override
+                            public void onCaptureCompleted(@NonNull CameraCaptureSession session,
+                                                           @NonNull CaptureRequest request,
+                                                           @NonNull TotalCaptureResult result) {
+                                super.onCaptureCompleted(session, request, result);
+                                createCameraPreview();  // Restart camera preview after capturing the image
+                            }
+                        }, mBackgroundHandler);
                     } catch (CameraAccessException e) {
                         e.printStackTrace();
                     }
                 }
 
                 @Override
-                public void onConfigureFailed(CameraCaptureSession session) {}
+                public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+                    Toast.makeText(MainActivity.this, "Configuration change", Toast.LENGTH_SHORT).show();
+                }
             }, mBackgroundHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
@@ -189,22 +196,29 @@ public class MainActivity extends Activity {
     ImageReader.OnImageAvailableListener readerListener = new ImageReader.OnImageAvailableListener() {
         @Override
         public void onImageAvailable(ImageReader reader) {
-            try (Image image = reader.acquireNextImage()) {
-                ByteBuffer buffer = image.getPlanes()[0].getBuffer();
-                byte[] imageBytes = new byte[buffer.capacity()];
-                buffer.get(imageBytes);
+            Image image = null;
+            try {
+                image = reader.acquireNextImage();
+                if (image != null) {
+                    ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+                    byte[] imageBytes = new byte[buffer.capacity()];
+                    buffer.get(imageBytes);
 
-                // Compress the image before sending it
-                Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
-                ByteArrayOutputStream stream = new ByteArrayOutputStream();
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream);  // 80% quality to reduce size
-                byte[] compressedBytes = stream.toByteArray();
+                    // Compress the image before sending it
+                    Bitmap bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
+                    ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream);  // 80% quality to reduce size
+                    byte[] compressedBytes = stream.toByteArray();
 
-                // Sending compressedBytes via HTTP POST request
-                new ImageUploadTask(compressedBytes).uploadImage("http://10.136.9.145:5000/upload");
-
+                    // Execute the image upload task asynchronously using ExecutorService
+                    new ImageUploadTask(compressedBytes, "http://10.136.9.145:5000/upload", MainActivity.this).uploadImage();
+                }
             } catch (Exception e) {
                 e.printStackTrace();
+            } finally {
+                if (image != null) {
+                    image.close();  // Important: Close the image to avoid caching issues
+                }
             }
         }
     };
