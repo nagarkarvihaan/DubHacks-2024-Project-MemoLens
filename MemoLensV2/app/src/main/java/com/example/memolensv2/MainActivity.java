@@ -35,6 +35,14 @@ import java.util.List;
 
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
+import android.media.MediaRecorder;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 
 
 public class MainActivity extends Activity {
@@ -53,6 +61,11 @@ public class MainActivity extends Activity {
     private Button mRecordButton;
     private boolean isRecording = false;
     private Drawable originalButtonBackground;
+    private AudioRecord audioRecord;
+    private ExecutorService executorService;
+    private int bufferSize = AudioRecord.getMinBufferSize(44100, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+    private ByteArrayOutputStream byteOutputStream;  // In-memory storage for audio data
+    private static final int REQUEST_AUDIO_PERMISSION_CODE = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,22 +80,28 @@ public class MainActivity extends Activity {
 
         // Find the buttons
         mRecordButton = findViewById(R.id.btn_record);
-
-        // Store the button's original background to restore it later
         originalButtonBackground = mRecordButton.getBackground();
 
-        // Set up click listener for recording button
+        // Initialize the executor service for asynchronous tasks
+        executorService = Executors.newSingleThreadExecutor();
+
+        // Set up the recording button
         mRecordButton.setOnClickListener(v -> {
             if (isRecording) {
-                stopRecording();  // Stop recording
+                stopRecording();
                 mRecordButton.setText("Buzz");
-                mRecordButton.setBackground(originalButtonBackground);  // Restore original background
+                mRecordButton.setBackground(originalButtonBackground);
             } else {
-                startRecording();  // Start recording
-                mRecordButton.setText("Stop Recording");
-                mRecordButton.setBackgroundColor(Color.RED);  // Change button to red
+                // Check for permissions before starting recording
+                if (checkPermissions()) {
+                    startRecording();
+                    mRecordButton.setText("Stop Recording");
+                    mRecordButton.setBackgroundColor(Color.RED);
+                } else {
+                    requestPermissions();
+                }
             }
-            isRecording = !isRecording;  // Toggle the recording state
+            isRecording = !isRecording;
         });
 
         startBackgroundThread();
@@ -272,17 +291,94 @@ public class MainActivity extends Activity {
                 finish();
             }
         }
+
+        if (requestCode == REQUEST_AUDIO_PERMISSION_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d(TAG, "Audio recording permission granted");
+                startRecording();
+            } else {
+                Log.w(TAG, "Audio recording permission denied");
+                Toast.makeText(this, "Audio recording permission denied", Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
-    // Placeholder methods for recording
     private void startRecording() {
-        // Add the logic to start recording (we’ll add it step by step)
+        // Check if the RECORD_AUDIO permission is granted
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            Log.w(TAG, "Requesting audio recording permission");
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_AUDIO_PERMISSION_CODE);
+            return;
+        }
+
+        // Proceed with recording since permission is granted
+        audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC,
+                44100,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                bufferSize);
+
+        audioRecord.startRecording();
+
+        byteOutputStream = new ByteArrayOutputStream();  // Initialize in-memory storage
+
+        // Run the recording in a background thread using ExecutorService
+        executorService.submit(this::writeAudioDataToMemory);
+
         Toast.makeText(this, "Recording started", Toast.LENGTH_SHORT).show();
     }
 
+    private boolean checkPermissions() {
+        // Check if permission to record audio is granted
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestPermissions() {
+        // Request the audio recording permission
+        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_AUDIO_PERMISSION_CODE);
+    }
+
+
+    private void writeAudioDataToMemory() {
+        byte[] audioData = new byte[bufferSize];
+        int totalBytesRead = 0;
+
+        while (isRecording) {
+            int bytesRead = audioRecord.read(audioData, 0, audioData.length);
+            if (bytesRead > 0) {
+                byteOutputStream.write(audioData, 0, bytesRead);
+                totalBytesRead += bytesRead;
+                Log.d(TAG, "Bytes read: " + bytesRead + ", Total bytes: " + totalBytesRead);
+            }
+        }
+
+        Log.d(TAG, "Finished writing audio data to memory. Total bytes: " + totalBytesRead);
+    }
+
     private void stopRecording() {
-        // Add the logic to stop recording (we’ll add this step later)
-        Toast.makeText(this, "Recording stopped", Toast.LENGTH_SHORT).show();
+        if (audioRecord != null) {
+            isRecording = false;
+            audioRecord.stop();
+            audioRecord.release();
+            audioRecord = null;
+
+            // Process the in-memory PCM data and convert it to WAV format asynchronously
+            executorService.submit(() -> convertPcmToWavInMemory());
+
+            Toast.makeText(this, "Recording stopped", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void convertPcmToWavInMemory() {
+        byte[] pcmData = byteOutputStream.toByteArray();  // Get the in-memory PCM data
+        ByteArrayOutputStream wavOutputStream = new ByteArrayOutputStream();
+
+        // Write WAV header and PCM data into wavOutputStream
+        PcmToWavConverter.convertInMemory(pcmData, wavOutputStream, 44100, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+
+        // Upload the WAV data to AWS S3
+        AudioUploadTask uploadTask = new AudioUploadTask(wavOutputStream.toByteArray(), this);
+        uploadTask.uploadAudioFile("voice_input.wav");
     }
 
     @Override
