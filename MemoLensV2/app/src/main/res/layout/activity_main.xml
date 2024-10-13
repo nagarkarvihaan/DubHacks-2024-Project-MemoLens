@@ -29,6 +29,18 @@
         app:layout_constraintEnd_toEndOf="parent" />
 
     <!-- Record button placed in line with the capture button, aligned to the right -->
+
+    <Button
+        android:id="@+id/btn_playback"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:text="Playback"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="@id/btn_capture"
+        app:layout_constraintHorizontal_bias="0.22"
+        app:layout_constraintStart_toStartOf="parent" />
+
     <Button
         android:id="@+id/btn_record"
         android:layout_width="wrap_content"

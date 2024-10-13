@@ -22,6 +22,7 @@ import android.os.HandlerThread;
 import android.util.Log;
 import android.view.Surface;
 import android.view.TextureView;
+import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 
@@ -32,6 +33,21 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
+
+import android.graphics.Color;
+import android.graphics.drawable.Drawable;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
+import android.media.MediaRecorder;
+
+import com.amazonaws.Response;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+
 
 public class MainActivity extends Activity {
     private static final String TAG = "CameraCaptureApp";
@@ -47,51 +63,59 @@ public class MainActivity extends Activity {
     private static final int REQUEST_CAMERA_PERMISSION = 200;
 
     private Button mRecordButton;
+    private Button playbackButton;
     private boolean isRecording = false;
-    private Recorder recorder;
-
+    private Drawable originalButtonBackground;
+    private AudioRecord audioRecord;
+    private ExecutorService executorService;
+    private ResponseFetcher fetcher;
+    private int bufferSize = AudioRecord.getMinBufferSize(44100, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+    private ByteArrayOutputStream byteOutputStream;  // In-memory storage for audio data
     private static final int REQUEST_AUDIO_PERMISSION_CODE = 1;
+    private Context context;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        context = this;
 
-        // TextureView for camera preview
         mTextureView = findViewById(R.id.texture);
         mTextureView.setSurfaceTextureListener(textureListener);
 
-        // Camera capture button
         mTakePictureButton = findViewById(R.id.btn_capture);
         mTakePictureButton.setOnClickListener(v -> takePicture());
 
-        // Audio recording button
+        // Find the buttons
         mRecordButton = findViewById(R.id.btn_record);
+        originalButtonBackground = mRecordButton.getBackground();
 
-        // Initialize Recorder
-        String audioFilePath = getExternalFilesDir(null).getAbsolutePath();
-        recorder = new Recorder(audioFilePath, this);
+        // Initialize the executor service for asynchronous tasks
+        executorService = Executors.newSingleThreadExecutor();
+        fetcher = new ResponseFetcher(this, "ttsAudio.mp3", "agent_text_response.txt");
 
-        // Set up the record button listener
+        // Set up the recording button
         mRecordButton.setOnClickListener(v -> {
             if (isRecording) {
-                recorder.onStopButtonClicked();  // Stop recording, play audio, and upload the file
-                mRecordButton.setText("Start Recording");
+                stopRecording();
+                mRecordButton.setText("Buzz");
+                mRecordButton.setBackground(originalButtonBackground);
             } else {
+                // Check for permissions before starting recording
                 if (checkPermissions()) {
-                    recorder.startRecording();  // Start recording
+                    startRecording();
                     mRecordButton.setText("Stop Recording");
+                    mRecordButton.setBackgroundColor(Color.RED);
                 } else {
                     requestPermissions();
                 }
             }
-            isRecording = !isRecording;  // Toggle the recording state
+            isRecording = !isRecording;
         });
 
         startBackgroundThread();
     }
 
-    // TextureView listener for camera preview
     TextureView.SurfaceTextureListener textureListener = new TextureView.SurfaceTextureListener() {
         @Override
         public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
@@ -111,7 +135,6 @@ public class MainActivity extends Activity {
         public void onSurfaceTextureUpdated(SurfaceTexture surface) {}
     };
 
-    // Open camera for preview
     private void openCamera() {
         CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
@@ -126,7 +149,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    // Camera device state callback
     private final CameraDevice.StateCallback stateCallback = new CameraDevice.StateCallback() {
         @Override
         public void onOpened(CameraDevice camera) {
@@ -146,7 +168,6 @@ public class MainActivity extends Activity {
         }
     };
 
-    // Create camera preview
     protected void createCameraPreview() {
         try {
             SurfaceTexture texture = mTextureView.getSurfaceTexture();
@@ -173,7 +194,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    // Update camera preview
     private void updatePreview() {
         if (mCameraDevice == null) {
             return;
@@ -186,7 +206,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    // Capture an image
     private void takePicture() {
         if (mCameraDevice == null) {
             return;
@@ -230,7 +249,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    // ImageReader listener for captured image
     ImageReader.OnImageAvailableListener readerListener = new ImageReader.OnImageAvailableListener() {
         @Override
         public void onImageAvailable(ImageReader reader) {
@@ -248,7 +266,7 @@ public class MainActivity extends Activity {
                     bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream);  // 80% quality to reduce size
                     byte[] compressedBytes = stream.toByteArray();
 
-                    // Execute the image upload task asynchronously
+                    // Execute the image upload task asynchronously using ExecutorService
                     new ImageUploadTask(compressedBytes, "http://10.136.9.145:5000/upload", MainActivity.this).uploadImage();
                 }
             } catch (Exception e) {
@@ -261,7 +279,6 @@ public class MainActivity extends Activity {
         }
     };
 
-    // Close camera
     private void closeCamera() {
         if (mCameraDevice != null) {
             mCameraDevice.close();
@@ -269,11 +286,109 @@ public class MainActivity extends Activity {
         }
     }
 
-    // Start background thread for camera operations
     protected void startBackgroundThread() {
         mBackgroundThread = new HandlerThread("Camera Background");
         mBackgroundThread.start();
         mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if (requestCode == REQUEST_CAMERA_PERMISSION) {
+            if (grantResults[0] == PackageManager.PERMISSION_DENIED) {
+                Toast.makeText(this, "Camera permission denied", Toast.LENGTH_LONG).show();
+                finish();
+            }
+        }
+
+        if (requestCode == REQUEST_AUDIO_PERMISSION_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d(TAG, "Audio recording permission granted");
+                startRecording();
+            } else {
+                Log.w(TAG, "Audio recording permission denied");
+                Toast.makeText(this, "Audio recording permission denied", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void startRecording() {
+        // Check if the RECORD_AUDIO permission is granted
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            Log.w(TAG, "Requesting audio recording permission");
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_AUDIO_PERMISSION_CODE);
+            return;
+        }
+
+        // Proceed with recording since permission is granted
+        audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC,
+                44100,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                bufferSize);
+
+        audioRecord.startRecording();
+
+        byteOutputStream = new ByteArrayOutputStream();  // Initialize in-memory storage
+
+        // Run the recording in a background thread using ExecutorService
+        executorService.submit(this::writeAudioDataToMemory);
+
+        Toast.makeText(this, "Recording started", Toast.LENGTH_SHORT).show();
+    }
+
+    private boolean checkPermissions() {
+        // Check if permission to record audio is granted
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestPermissions() {
+        // Request the audio recording permission
+        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_AUDIO_PERMISSION_CODE);
+    }
+
+
+    private void writeAudioDataToMemory() {
+        byte[] audioData = new byte[bufferSize];
+        int totalBytesRead = 0;
+
+        while (isRecording) {
+            int bytesRead = audioRecord.read(audioData, 0, audioData.length);
+            if (bytesRead > 0) {
+                byteOutputStream.write(audioData, 0, bytesRead);
+                totalBytesRead += bytesRead;
+                Log.d(TAG, "Bytes read: " + bytesRead + ", Total bytes: " + totalBytesRead);
+            }
+        }
+
+        Log.d(TAG, "Finished writing audio data to memory. Total bytes: " + totalBytesRead);
+    }
+
+    private void stopRecording() {
+        if (audioRecord != null) {
+            isRecording = false;
+            audioRecord.stop();
+            audioRecord.release();
+            audioRecord = null;
+
+            // Process the in-memory PCM data and convert it to WAV format asynchronously
+            executorService.submit(() -> convertPcmToWavInMemory());
+
+            Toast.makeText(this, "Recording stopped", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void convertPcmToWavInMemory() {
+        byte[] pcmData = byteOutputStream.toByteArray();  // Get the in-memory PCM data
+        ByteArrayOutputStream wavOutputStream = new ByteArrayOutputStream();
+
+        // Write WAV header and PCM data into wavOutputStream
+        PcmToWavConverter.convertInMemory(pcmData, wavOutputStream, 44100, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+
+        // Upload the WAV data to AWS S3
+        AudioUploadTask uploadTask = new AudioUploadTask(wavOutputStream.toByteArray(), this);
+        uploadTask.uploadAudioFile("voice_input.wav");
+        fetcher.beginPolling();
     }
 
     @Override
@@ -286,33 +401,5 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         super.onDestroy();
         closeCamera();
-    }
-
-    private boolean checkPermissions() {
-        return ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
-    }
-
-    private void requestPermissions() {
-        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_AUDIO_PERMISSION_CODE);
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        if (requestCode == REQUEST_AUDIO_PERMISSION_CODE) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.d(TAG, "Audio recording permission granted");
-                recorder.startRecording();
-            } else {
-                Log.w(TAG, "Audio recording permission denied");
-                Toast.makeText(this, "Audio recording permission denied", Toast.LENGTH_SHORT).show();
-            }
-        }
-
-        if (requestCode == REQUEST_CAMERA_PERMISSION) {
-            if (grantResults[0] == PackageManager.PERMISSION_DENIED) {
-                Toast.makeText(this, "Camera permission denied", Toast.LENGTH_LONG).show();
-                finish();
-            }
-        }
     }
 }
