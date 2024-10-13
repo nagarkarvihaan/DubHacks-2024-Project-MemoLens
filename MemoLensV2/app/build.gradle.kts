@@ -43,4 +43,5 @@ dependencies {
     implementation(libs.aws.android.sdk.s3) // AWS SDK for Android S3
     implementation(libs.aws.android.sdk.core) // AWS Core SDK
     implementation(libs.aws.android.sdk.mobile.client) // AWS Mobile Client
+    implementation(libs.ffmpeg.kit.full)
 }
