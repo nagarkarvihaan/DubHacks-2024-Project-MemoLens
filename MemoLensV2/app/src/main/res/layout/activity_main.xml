@@ -37,9 +37,7 @@
         android:layout_marginBottom="16dp"
         android:text="Playback"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="@id/btn_capture"
-        app:layout_constraintHorizontal_bias="0.22"
-        app:layout_constraintStart_toStartOf="parent" />
+        app:layout_constraintEnd_toEndOf="@id/btn_capture" />
 
     <Button
         android:id="@+id/btn_record"

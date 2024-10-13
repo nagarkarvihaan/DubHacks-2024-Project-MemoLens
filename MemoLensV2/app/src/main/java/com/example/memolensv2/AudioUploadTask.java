@@ -12,115 +12,109 @@ import com.amazonaws.mobileconnectors.s3.transferutility.TransferState;
 import com.amazonaws.mobileconnectors.s3.transferutility.TransferUtility;
 import com.amazonaws.mobileconnectors.s3.transferutility.TransferNetworkLossHandler;
 import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.s3.model.PutObjectRequest;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+//  private static final String ACCESS_KEY = "AKIA4SYAMJUQI73QQ4XF";  // Replace with your AWS Access Key
+//    private static final String SECRET_KEY = "rU21X/KDArxo0mLfLVrMspylmrOujS6KaB9Pzm2/";  // Replace with your AWS Secret Key
+//    private static final String BUCKET_NAME = "vuzix-audio-bucket";
+
 public class AudioUploadTask {
     private static final String TAG = "AudioUploadTask";
-    private byte[] audioBytes;  // The in-memory audio data (e.g., WAV)
-    private String bucketName = "vuzix-audio-bucket"; // Replace with your S3 bucket name
+    private String filePath;  // Path to the audio file to be uploaded
+    private String bucketName = "vuzix-audio-bucket";  // Replace with your S3 bucket name
     private Context context;
-    private AmazonS3Client s3Client;
     private static final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
     // AWS S3 details
     private TransferUtility transferUtility;
 
-    // Replace these with your own API keys
-    private static final String ACCESS_KEY = "AKIA4SYAMJUQI73QQ4XF";
-    private static final String SECRET_KEY = "rU21X/KDArxo0mLfLVrMspylmrOujS6KaB9Pzm2/";
+    // Replace these with your own AWS credentials
+    private static final String ACCESS_KEY = "YOUR_ACCESS_KEY";
+    private static final String SECRET_KEY = "YOUR_SECRET_KEY";
 
-    // Constructor
-    public AudioUploadTask(byte[] audioBytes, Context context) {
-        this.audioBytes = audioBytes;
+    // Constructor: Accepts the file path to the audio file and the context for Toast notifications
+    public AudioUploadTask(String filePath, Context context) {
+        this.filePath = filePath;
         this.context = context;
 
-        // Set up the S3 client with hardcoded credentials
-        s3Client = new AmazonS3Client(new BasicAWSCredentials(ACCESS_KEY, SECRET_KEY));
+        // Set up the S3 client with hardcoded credentials (for testing purposes)
+        AmazonS3Client s3Client = new AmazonS3Client(new BasicAWSCredentials(ACCESS_KEY, SECRET_KEY));
 
-        // Set up TransferUtility for file upload
+        // Set up TransferUtility for file uploads
         transferUtility = TransferUtility.builder()
                 .context(context)
                 .s3Client(s3Client)
                 .build();
 
-        TransferNetworkLossHandler.getInstance(context);
+        TransferNetworkLossHandler.getInstance(context);  // Handles network loss scenarios for the upload
     }
 
-    // Method to upload audio asynchronously with a custom file name
+    // Method to upload the audio file asynchronously
     public void uploadAudioFile(String customFileName) {
         executorService.execute(() -> {
-            try {
-                // Create temporary file from the audio data
-                File tempFile = createTempWavFile(audioBytes);
+            File audioFile = new File(filePath);  // Use the file path to get the audio file
 
-                if (tempFile != null) {
-                    // Set the folder path to 'uploads/' and use the custom file name
-                    String folderPath = "uploads/";  // This will store files in the 'uploads' folder
+            // Ensure the file exists before starting the upload
+            if (audioFile.exists()) {
+                String folderPath = "uploads/";  // Folder path in S3 for uploading the file
 
-                    // Upload the file to S3 with the folder path and custom file name
-                    transferUtility.upload(
-                            bucketName,  // The bucket to upload to
-                            folderPath + customFileName,  // The key for the object (including folder path and custom file name)
-                            tempFile  // The file to upload
-                    ).setTransferListener(new TransferListener() {
-                        @Override
-                        public void onStateChanged(int id, TransferState state) {
-                            if (state == TransferState.COMPLETED) {
-                                Log.d(TAG, "Upload completed successfully");
-                                notifyUploadSuccess();
+                // Start the upload process
+                transferUtility.upload(
+                        bucketName,  // The S3 bucket to upload to
+                        folderPath + customFileName,  // The key for the S3 object (folder path + file name)
+                        audioFile  // The actual file to upload
+                ).setTransferListener(new TransferListener() {
+                    @Override
+                    public void onStateChanged(int id, TransferState state) {
+                        // Upload completed successfully
+                        if (state == TransferState.COMPLETED) {
+                            Log.d(TAG, "Upload completed successfully");
+
+                            // Delete the temporary file after a successful upload
+                            if (audioFile.exists()) {
+                                if (audioFile.delete()) {
+                                    Log.d(TAG, "Temporary file deleted after successful upload.");
+                                } else {
+                                    Log.e(TAG, "Failed to delete temporary file after upload.");
+                                }
                             }
-                        }
 
-                        @Override
-                        public void onProgressChanged(int id, long bytesCurrent, long bytesTotal) {
-                            Log.d(TAG, "Upload progress: " + bytesCurrent + " / " + bytesTotal);
+                            notifyUploadSuccess();
+                        } else if (state == TransferState.FAILED) {
+                            Log.e(TAG, "Upload failed. State: " + state);
+                            notifyUploadError(new Exception("Upload failed with state: " + state));
                         }
+                    }
 
-                        @Override
-                        public void onError(int id, Exception ex) {
-                            Log.e(TAG, "Error occurred during upload: " + ex.getMessage(), ex);
-                            notifyUploadError(ex);
-                        }
-                    });
-                } else {
-                    Log.e(TAG, "Failed to create temp WAV file for upload");
-                    notifyUploadError(new Exception("Failed to create temp file"));
-                }
+                    @Override
+                    public void onProgressChanged(int id, long bytesCurrent, long bytesTotal) {
+                        Log.d(TAG, "Upload progress: " + bytesCurrent + " / " + bytesTotal);
+                    }
 
-            } catch (Exception e) {
-                Log.e(TAG, "Exception during upload: " + e.getMessage(), e);
-                notifyUploadError(e);
+                    @Override
+                    public void onError(int id, Exception ex) {
+                        Log.e(TAG, "Error occurred during upload: " + ex.getMessage(), ex);
+                        notifyUploadError(ex);
+                    }
+                });
+            } else {
+                Log.e(TAG, "Audio file does not exist. Cannot upload.");
+                notifyUploadError(new Exception("File not found at path: " + filePath));
             }
         });
     }
 
-    // Helper method to create a temporary file from the in-memory byte array
-    private File createTempWavFile(byte[] audioData) throws IOException {
-        File tempFile = File.createTempFile("audio", ".wav", context.getCacheDir());
-        try (FileOutputStream fos = new FileOutputStream(tempFile)) {
-            fos.write(audioData);
-            Log.d(TAG, "Successfully wrote audio data to temp WAV file");
-        } catch (IOException e) {
-            Log.e(TAG, "Error writing audio data to temp file: " + e.getMessage(), e);
-            return null;
-        }
-        return tempFile;
-    }
-
-    // Helper methods to update the UI after upload
+    // Helper method to notify success via Toast (runs on UI thread)
     private void notifyUploadSuccess() {
         new Handler(Looper.getMainLooper()).post(() -> {
-            Toast.makeText(context, "Upload completed", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, "Upload completed successfully", Toast.LENGTH_SHORT).show();
         });
     }
 
+    // Helper method to notify an upload error via Toast (runs on UI thread)
     private void notifyUploadError(Exception ex) {
         new Handler(Looper.getMainLooper()).post(() -> {
             Toast.makeText(context, "Error uploading: " + ex.getMessage(), Toast.LENGTH_LONG).show();
