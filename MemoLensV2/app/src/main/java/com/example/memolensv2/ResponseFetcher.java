@@ -29,6 +29,7 @@ public class ResponseFetcher {
     private Context context;
     private String audioPath, textPath;
     private SharedPreferences sharedPreferences;
+    private MediaPlayer mediaPlayer;
 
     // Replace these with your own API keys
     private static final String ACCESS_KEY = "AKIA4SYAMJUQI73QQ4XF";
@@ -99,7 +100,7 @@ public class ResponseFetcher {
             outputStream.close();
             inputStream.close();
 
-            MediaPlayer mediaPlayer = new MediaPlayer();
+            mediaPlayer = new MediaPlayer();
             mediaPlayer.setDataSource(tempFile.getAbsolutePath());
             mediaPlayer.prepare();
             mediaPlayer.start();
