@@ -22,10 +22,21 @@
         android:id="@+id/btn_capture"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/capture"
+        android:text="Capture"
+        android:layout_marginBottom="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginBottom="16dp" />
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Record button placed in line with the capture button, aligned to the right -->
+    <Button
+        android:id="@+id/btn_record"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Buzz"
+        android:layout_marginBottom="16dp"
+        android:layout_marginStart="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toEndOf="@id/btn_capture" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -33,6 +33,10 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 
+import android.graphics.Color;
+import android.graphics.drawable.Drawable;
+
+
 public class MainActivity extends Activity {
     private static final String TAG = "CameraCaptureApp";
     private TextureView mTextureView;
@@ -46,6 +50,10 @@ public class MainActivity extends Activity {
 
     private static final int REQUEST_CAMERA_PERMISSION = 200;
 
+    private Button mRecordButton;
+    private boolean isRecording = false;
+    private Drawable originalButtonBackground;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -56,6 +64,26 @@ public class MainActivity extends Activity {
 
         mTakePictureButton = findViewById(R.id.btn_capture);
         mTakePictureButton.setOnClickListener(v -> takePicture());
+
+        // Find the buttons
+        mRecordButton = findViewById(R.id.btn_record);
+
+        // Store the button's original background to restore it later
+        originalButtonBackground = mRecordButton.getBackground();
+
+        // Set up click listener for recording button
+        mRecordButton.setOnClickListener(v -> {
+            if (isRecording) {
+                stopRecording();  // Stop recording
+                mRecordButton.setText("Buzz");
+                mRecordButton.setBackground(originalButtonBackground);  // Restore original background
+            } else {
+                startRecording();  // Start recording
+                mRecordButton.setText("Stop Recording");
+                mRecordButton.setBackgroundColor(Color.RED);  // Change button to red
+            }
+            isRecording = !isRecording;  // Toggle the recording state
+        });
 
         startBackgroundThread();
     }
@@ -244,6 +272,17 @@ public class MainActivity extends Activity {
                 finish();
             }
         }
+    }
+
+    // Placeholder methods for recording
+    private void startRecording() {
+        // Add the logic to start recording (we’ll add it step by step)
+        Toast.makeText(this, "Recording started", Toast.LENGTH_SHORT).show();
+    }
+
+    private void stopRecording() {
+        // Add the logic to stop recording (we’ll add this step later)
+        Toast.makeText(this, "Recording stopped", Toast.LENGTH_SHORT).show();
     }
 
     @Override
