@@ -37,6 +37,7 @@ public class Recorder {
     public Recorder(String dir, Context context) {
         this.audioFilePath = dir + "/new_audio.3gp";  // Save audio as .3gp file
         this.context = context;
+        fetcher = new ResponseFetcher(context, "ttsAudio.mp3", "agent_text_response.txt");
     }
 
     // Start recording
