@@ -17,14 +17,10 @@ import java.io.File;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-//  private static final String ACCESS_KEY = "AKIA4SYAMJUQI73QQ4XF";  // Replace with your AWS Access Key
-//    private static final String SECRET_KEY = "rU21X/KDArxo0mLfLVrMspylmrOujS6KaB9Pzm2/";  // Replace with your AWS Secret Key
-//    private static final String BUCKET_NAME = "vuzix-audio-bucket";
-
 public class AudioUploadTask {
     private static final String TAG = "AudioUploadTask";
     private String filePath;  // Path to the audio file to be uploaded
-    private String bucketName = "vuzix-audio-bucket";  // Replace with your S3 bucket name
+    private String bucketName = "Bucket1";  // Replace with your S3 bucket name
     private Context context;
     private static final ExecutorService executorService = Executors.newSingleThreadExecutor();
 

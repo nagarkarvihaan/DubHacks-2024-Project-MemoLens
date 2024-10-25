@@ -189,6 +189,8 @@ public class MainActivity extends Activity {
     // Capture an image
     private void takePicture() {
         if (mCameraDevice == null) {
+            Log.e(TAG, "Camera device is null.");
+            Toast.makeText(this, "Camera is not initialized.", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -205,17 +207,17 @@ public class MainActivity extends Activity {
             mCameraDevice.createCaptureSession(outputSurfaces, new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
+                    Log.d(TAG, "Capture session configured successfully.");
                     try {
                         session.capture(mCaptureRequestBuilder.build(), new CameraCaptureSession.CaptureCallback() {
                             @Override
-                            public void onCaptureCompleted(@NonNull CameraCaptureSession session,
-                                                           @NonNull CaptureRequest request,
-                                                           @NonNull TotalCaptureResult result) {
-                                super.onCaptureCompleted(session, request, result);
+                            public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
+                                Log.d(TAG, "Image capture completed.");
                                 createCameraPreview();  // Restart camera preview after capturing the image
                             }
                         }, mBackgroundHandler);
                     } catch (CameraAccessException e) {
+                        Log.e(TAG, "Error capturing image: " + e.getMessage());
                         e.printStackTrace();
                     }
                 }
@@ -238,6 +240,7 @@ public class MainActivity extends Activity {
             try {
                 image = reader.acquireNextImage();
                 if (image != null) {
+                    Log.d(TAG, "Image captured successfully.");
                     ByteBuffer buffer = image.getPlanes()[0].getBuffer();
                     byte[] imageBytes = new byte[buffer.capacity()];
                     buffer.get(imageBytes);
@@ -249,9 +252,12 @@ public class MainActivity extends Activity {
                     byte[] compressedBytes = stream.toByteArray();
 
                     // Execute the image upload task asynchronously
-                    new ImageUploadTask(compressedBytes, "http://10.136.9.145:5000/upload", MainActivity.this).uploadImage();
+                    new ImageUploadTask(compressedBytes, "http://10.18.200.172:5000/upload", MainActivity.this).uploadImage();
+                } else {
+                    Log.e(TAG, "Image capture failed.");
                 }
             } catch (Exception e) {
+                Log.e(TAG, "Error capturing image: " + e.getMessage());
                 e.printStackTrace();
             } finally {
                 if (image != null) {
@@ -309,7 +315,10 @@ public class MainActivity extends Activity {
         }
 
         if (requestCode == REQUEST_CAMERA_PERMISSION) {
-            if (grantResults[0] == PackageManager.PERMISSION_DENIED) {
+            if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // If permission is granted, open the camera
+                openCamera();
+            } else {
                 Toast.makeText(this, "Camera permission denied", Toast.LENGTH_LONG).show();
                 finish();
             }

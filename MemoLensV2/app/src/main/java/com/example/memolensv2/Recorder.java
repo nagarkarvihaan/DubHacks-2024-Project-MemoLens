@@ -29,9 +29,9 @@ public class Recorder {
     private ResponseFetcher fetcher;
 
     // AWS Credentials (hardcoded)
-    private static final String ACCESS_KEY = "AKIA4SYAMJUQI73QQ4XF";  // Replace with your AWS Access Key
-    private static final String SECRET_KEY = "rU21X/KDArxo0mLfLVrMspylmrOujS6KaB9Pzm2/";  // Replace with your AWS Secret Key
-    private static final String BUCKET_NAME = "vuzix-audio-bucket";  // Replace with your S3 bucket name
+    private static final String ACCESS_KEY = "Key1";  // Replace with your AWS Access Key
+    private static final String SECRET_KEY = "Key2";  // Replace with your AWS Secret Key
+    private static final String BUCKET_NAME = "Bucket1";  // Replace with your S3 bucket name
 
     // Constructor
     public Recorder(String dir, Context context) {

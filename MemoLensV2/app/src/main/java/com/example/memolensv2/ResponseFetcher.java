@@ -23,7 +23,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class ResponseFetcher {
-    private String bucketName = "vuzix-audio-bucket";
+    private String bucketName = "Bucket1";
     private String folderPath = "Outputmp3/";
     private AmazonS3Client s3Client;
     private Context context;
@@ -32,8 +32,8 @@ public class ResponseFetcher {
     private MediaPlayer mediaPlayer;
 
     // Replace these with your own API keys
-    private static final String ACCESS_KEY = "AKIA4SYAMJUQI73QQ4XF";
-    private static final String SECRET_KEY = "rU21X/KDArxo0mLfLVrMspylmrOujS6KaB9Pzm2/";
+    private static final String ACCESS_KEY = "Key1";
+    private static final String SECRET_KEY = "Key2";
 
     public ResponseFetcher(Context context, String audioFile, String textFile) {
         this.context = context;

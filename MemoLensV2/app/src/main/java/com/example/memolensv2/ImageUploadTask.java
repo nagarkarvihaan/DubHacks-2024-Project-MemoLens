@@ -41,12 +41,16 @@ public class ImageUploadTask {
                 connection.setConnectTimeout(600000);  // 10 minutes
                 connection.setReadTimeout(600000);     // 10 minutes
 
+                Log.d(TAG, "Uploading image to server: " + serverUrl);
+
                 DataOutputStream outputStream = new DataOutputStream(connection.getOutputStream());
                 outputStream.write(imageBytes);
                 outputStream.flush();
                 outputStream.close();
 
                 int responseCode = connection.getResponseCode();
+                Log.d(TAG, "Response code: " + responseCode);
+
                 if (responseCode == HttpURLConnection.HTTP_OK) {
                     InputStream inputStream = connection.getInputStream();
                     byte[] responseBuffer = new byte[1024];
