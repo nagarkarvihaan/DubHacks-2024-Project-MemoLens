@@ -16,10 +16,10 @@ def lambda_handler(event, context):
         interval = parameters["Interval"]  # No integer conversion
         name = parameters["MedicationName"]
         instructions = parameters["Instructions"]
-        firebaseProjectId = "memolens-5aa64"
-        firebaseDatabase = "(default)"  # Default database name
-        firebaseCollection = "Medications"
-        firebaseApiKey = "AIzaSyDMgLUFCo_vHasB4nCm8smXRfP4xMPddeQ"
+        firebaseProjectId = "YOUR_PROJECT_ID"
+        firebaseDatabase = "YOUR_DATABASE"  # Default database name
+        firebaseCollection = "YOUR_COLLECTION"
+        firebaseApiKey = "YOUR_API_KEY"
 
         # Build the payload for creating a new document in Firebase
         payload = {

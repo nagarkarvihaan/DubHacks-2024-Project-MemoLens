@@ -15,9 +15,9 @@ logger = logging.getLogger()
 transcoder_client = boto3.client('elastictranscoder')
 transcribe_client = boto3.client('transcribe')
 s3_client = boto3.client('s3') # Initialize S3 client
-bedrock_client = boto3.client('bedrock-runtime', region_name='us-west-2') # Ensure you have the right permissions for Bedrock
+bedrock_client = boto3.client('bedrock-runtime', region_name='YOUR_REGION') # Ensure you have the right permissions for Bedrock
 bedrock_agent_runtime = boto3.client(
-    service_name="bedrock-agent-runtime", region_name='us-west-2'
+    service_name="bedrock-agent-runtime", region_name='YOUR_REGION'
 )
 polly = boto3.client('polly')
 
@@ -38,8 +38,8 @@ def lambda_handler(event, context):
 
 
         # Upload audio to S3 (needed for Transcribe service)
-        s3_bucket = 'vuzix-audio-bucket'
-        s3_key = 'uploads/audio_recording.3gp'
+        s3_bucket = 'YOUR_AUDIO_BUCKET'
+        s3_key = 'FILE_PATH_IN_BUCKET'
 
         transcoder_client.create_job(
             PipelineId='1728805850855-grjruo',  # Replace with your pipeline ID
